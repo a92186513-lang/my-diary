@@ -1,0 +1,863 @@
+/* =========================
+   기본
+========================= */
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+
+  background: #f4f2ed;
+
+  color: #222;
+
+  font-family:
+    Arial,
+    "Apple SD Gothic Neo",
+    sans-serif;
+}
+
+
+button,
+input,
+textarea {
+  font-family: inherit;
+}
+
+
+button {
+  -webkit-tap-highlight-color:
+    transparent;
+}
+
+
+.app {
+  width: 100%;
+
+  max-width: 520px;
+
+  min-height: 100vh;
+
+  margin: 0 auto;
+
+  padding: 0 20px 60px;
+}
+
+
+/* =========================
+   화면 전환
+========================= */
+
+.screen {
+  display: none;
+}
+
+
+.screen.active {
+  display: block;
+}
+
+
+/* =========================
+   홈
+========================= */
+
+.home-header {
+  padding-top: 55px;
+
+  padding-bottom: 30px;
+}
+
+
+.small-title {
+  margin: 0 0 10px;
+
+  font-size: 11px;
+
+  letter-spacing: 3px;
+
+  color: #888;
+}
+
+
+.home-header h1 {
+  margin: 0;
+
+  font-size: 40px;
+
+  letter-spacing: -1.5px;
+}
+
+
+.home-subtitle {
+  margin-top: 10px;
+
+  color: #888;
+
+  font-size: 14px;
+}
+
+
+/* =========================
+   달력
+========================= */
+
+.calendar-card {
+  padding: 22px;
+
+  background: white;
+
+  border-radius: 24px;
+
+  box-shadow:
+    0 5px 25px
+    rgba(0, 0, 0, 0.03);
+}
+
+
+.calendar-header {
+  display: flex;
+
+  align-items: center;
+
+  justify-content: space-between;
+
+  margin-bottom: 23px;
+}
+
+
+.calendar-header h2 {
+  margin: 0;
+
+  font-size: 17px;
+
+  font-weight: 600;
+}
+
+
+.calendar-nav {
+  width: 40px;
+
+  height: 40px;
+
+  border: 0;
+
+  background: transparent;
+
+  font-size: 28px;
+
+  cursor: pointer;
+}
+
+
+.weekdays {
+  display: grid;
+
+  grid-template-columns:
+    repeat(7, 1fr);
+
+  margin-bottom: 8px;
+
+  color: #aaa;
+
+  text-align: center;
+
+  font-size: 11px;
+}
+
+
+.calendar-days {
+  display: grid;
+
+  grid-template-columns:
+    repeat(7, 1fr);
+
+  gap: 5px;
+}
+
+
+.calendar-day {
+  position: relative;
+
+  aspect-ratio: 1;
+
+  border: 0;
+
+  border-radius: 50%;
+
+  background: transparent;
+
+  font-size: 13px;
+
+  cursor: pointer;
+}
+
+
+.calendar-day:hover {
+  background: #f3f1ec;
+}
+
+
+.calendar-day.today {
+  border: 1px solid #222;
+}
+
+
+.calendar-day.has-diary::after {
+  content: "";
+
+  position: absolute;
+
+  bottom: 4px;
+
+  left: 50%;
+
+  width: 4px;
+
+  height: 4px;
+
+  border-radius: 50%;
+
+  background: #222;
+
+  transform:
+    translateX(-50%);
+}
+
+
+.empty-day {
+  aspect-ratio: 1;
+}
+
+
+/* =========================
+   오늘 기록하기
+========================= */
+
+.main-button {
+  width: 100%;
+
+  margin-top: 16px;
+
+  padding: 17px;
+
+  border: 0;
+
+  border-radius: 16px;
+
+  background: #222;
+
+  color: white;
+
+  font-size: 15px;
+
+  font-weight: 600;
+
+  cursor: pointer;
+}
+
+
+/* =========================
+   최근 기록
+========================= */
+
+.recent-section {
+  margin-top: 38px;
+}
+
+
+.section-header {
+  display: flex;
+
+  align-items: center;
+
+  justify-content: space-between;
+
+  margin-bottom: 15px;
+}
+
+
+.section-header h2 {
+  margin: 0;
+
+  font-size: 18px;
+}
+
+
+#entryCount {
+  color: #999;
+
+  font-size: 12px;
+}
+
+
+.recent-item {
+  display: flex;
+
+  align-items: center;
+
+  gap: 14px;
+
+  width: 100%;
+
+  margin-bottom: 10px;
+
+  padding: 17px;
+
+  border: 0;
+
+  border-radius: 18px;
+
+  background: white;
+
+  text-align: left;
+
+  cursor: pointer;
+}
+
+
+.recent-mood {
+  width: 40px;
+
+  font-size: 24px;
+
+  text-align: center;
+}
+
+
+.recent-text {
+  flex: 1;
+
+  min-width: 0;
+}
+
+
+.recent-title {
+  overflow: hidden;
+
+  margin-bottom: 5px;
+
+  font-size: 14px;
+
+  font-weight: 600;
+
+  text-overflow: ellipsis;
+
+  white-space: nowrap;
+}
+
+
+.recent-date {
+  color: #999;
+
+  font-size: 11px;
+}
+
+
+.empty-message {
+  padding: 35px 15px;
+
+  color: #aaa;
+
+  text-align: center;
+
+  font-size: 13px;
+}
+
+
+/* =========================
+   작성 화면
+========================= */
+
+.editor-header {
+  display: flex;
+
+  align-items: center;
+
+  gap: 16px;
+
+  padding-top: 45px;
+
+  padding-bottom: 25px;
+}
+
+
+.back-button {
+  width: 42px;
+
+  height: 42px;
+
+  border: 0;
+
+  border-radius: 50%;
+
+  background: white;
+
+  font-size: 20px;
+
+  cursor: pointer;
+}
+
+
+.editor-header h1 {
+  margin: 4px 0 0;
+
+  font-size: 25px;
+}
+
+
+.editor-date {
+  margin: 0;
+
+  color: #888;
+
+  font-size: 12px;
+}
+
+
+/* =========================
+   카드
+========================= */
+
+.card {
+  margin-bottom: 14px;
+
+  padding: 22px;
+
+  border-radius: 22px;
+
+  background: white;
+}
+
+
+.card h2 {
+  margin: 0 0 18px;
+
+  font-size: 16px;
+}
+
+
+/* =========================
+   기분
+========================= */
+
+.moods {
+  display: flex;
+
+  justify-content: space-between;
+}
+
+
+.mood {
+  padding: 8px;
+
+  border: 0;
+
+  border-radius: 50%;
+
+  background: transparent;
+
+  font-size: 29px;
+
+  cursor: pointer;
+
+  transition:
+    transform 0.15s;
+}
+
+
+.mood:active {
+  transform: scale(0.9);
+}
+
+
+.mood.selected {
+  background: #eeeae2;
+
+  transform: scale(1.15);
+}
+
+
+/* =========================
+   입력
+========================= */
+
+label {
+  display: block;
+
+  margin-bottom: 8px;
+
+  font-size: 13px;
+
+  font-weight: 600;
+}
+
+
+input,
+textarea {
+  width: 100%;
+
+  padding: 14px;
+
+  border: 1px solid #e8e8e8;
+
+  border-radius: 12px;
+
+  outline: none;
+
+  background: #fafafa;
+
+  color: #222;
+
+  font-size: 15px;
+}
+
+
+input:focus,
+textarea:focus {
+  border-color: #999;
+
+  background: white;
+}
+
+
+textarea {
+  min-height: 200px;
+
+  margin-top: 0;
+
+  resize: vertical;
+
+  line-height: 1.7;
+}
+
+
+#content {
+  margin-bottom: 0;
+}
+
+
+.card label:not(:first-child) {
+  margin-top: 22px;
+}
+
+
+/* =========================
+   사진
+========================= */
+
+.photo-title-row {
+  display: flex;
+
+  align-items: center;
+
+  justify-content: space-between;
+}
+
+
+.photo-title-row h2 {
+  margin: 0;
+}
+
+
+.photo-button {
+  margin: 0;
+
+  padding: 9px 13px;
+
+  border: 1px solid #ddd;
+
+  border-radius: 11px;
+
+  background: white;
+
+  font-size: 12px;
+
+  font-weight: normal;
+
+  cursor: pointer;
+}
+
+
+.photo-guide {
+  margin: 12px 0;
+
+  color: #aaa;
+
+  font-size: 11px;
+}
+
+
+.photo-preview {
+  display: grid;
+
+  grid-template-columns:
+    repeat(3, 1fr);
+
+  gap: 7px;
+
+  margin-top: 15px;
+}
+
+
+.photo-item {
+  position: relative;
+
+  overflow: hidden;
+
+  aspect-ratio: 1;
+
+  border-radius: 12px;
+
+  background: #eee;
+}
+
+
+.photo-item img {
+  display: block;
+
+  width: 100%;
+
+  height: 100%;
+
+  object-fit: cover;
+}
+
+
+.photo-remove {
+  position: absolute;
+
+  top: 5px;
+
+  right: 5px;
+
+  width: 25px;
+
+  height: 25px;
+
+  padding: 0;
+
+  border: 0;
+
+  border-radius: 50%;
+
+  background:
+    rgba(0, 0, 0, 0.65);
+
+  color: white;
+
+  font-size: 15px;
+
+  cursor: pointer;
+}
+
+
+/* =========================
+   저장 / 삭제
+========================= */
+
+.button-group {
+  display: flex;
+
+  gap: 10px;
+
+  margin-top: 18px;
+}
+
+
+.save-button {
+  flex: 1;
+
+  padding: 17px;
+
+  border: 0;
+
+  border-radius: 15px;
+
+  background: #222;
+
+  color: white;
+
+  font-size: 15px;
+
+  font-weight: 600;
+
+  cursor: pointer;
+}
+
+
+.delete-button {
+  width: 85px;
+
+  padding: 17px 10px;
+
+  border: 1px solid #ddd;
+
+  border-radius: 15px;
+
+  background: white;
+
+  color: #777;
+
+  font-size: 14px;
+
+  cursor: pointer;
+}
+
+
+.hidden {
+  display: none;
+}
+
+
+/* =========================
+   작은 화면
+========================= */
+
+@media (max-width: 380px) {
+
+  .app {
+    padding-left: 14px;
+
+    padding-right: 14px;
+  }
+
+  .photo-preview {
+    grid-template-columns:
+      repeat(2, 1fr);
+  }
+
+}
+/* =========================
+   로그인
+========================= */
+
+.login-screen {
+  position: fixed;
+
+  inset: 0;
+
+  z-index: 999;
+
+  display: flex;
+
+  align-items: center;
+
+  justify-content: center;
+
+  padding: 30px;
+
+  background: #f4f2ed;
+}
+
+
+.login-box {
+  width: 100%;
+
+  max-width: 400px;
+}
+
+
+.login-small-title {
+  margin-bottom: 25px;
+
+  color: #999;
+
+  font-size: 11px;
+
+  letter-spacing: 4px;
+}
+
+
+.login-box h1 {
+  margin: 0;
+
+  font-size: 44px;
+
+  line-height: 1.05;
+
+  letter-spacing: -2px;
+}
+
+
+.login-description {
+  margin-top: 20px;
+
+  color: #888;
+
+  font-size: 14px;
+
+  line-height: 1.7;
+}
+
+
+.google-login-button {
+  width: 100%;
+
+  margin-top: 45px;
+
+  padding: 17px;
+
+  border: 1px solid #ddd;
+
+  border-radius: 15px;
+
+  background: white;
+
+  color: #222;
+
+  font-size: 15px;
+
+  font-weight: 600;
+
+  cursor: pointer;
+}
+
+
+.google-login-button:hover {
+  background: #fafafa;
+}
+
+
+/* =========================
+   로그인 사용자
+========================= */
+
+.home-top {
+  display: flex;
+
+  align-items: center;
+
+  justify-content: space-between;
+}
+
+
+.home-top .small-title {
+  margin: 0;
+}
+
+
+.logout-button {
+  padding: 7px 10px;
+
+  border: 0;
+
+  background: transparent;
+
+  color: #999;
+
+  font-size: 11px;
+
+  cursor: pointer;
+}
+
+
+.user-email {
+  margin-top: 7px;
+
+  color: #aaa;
+
+  font-size: 11px;
+}
