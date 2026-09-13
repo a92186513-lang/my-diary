@@ -1,3 +1,5 @@
+// update-test-v22
+
 // =========================
 // HTML 요소
 // =========================
@@ -55,6 +57,21 @@ const saveButton =
 
 const deleteButton =
   document.getElementById("deleteBtn");
+
+const migrationBox =
+  document.getElementById(
+    "migrationBox"
+  );
+
+const migrationButton =
+  document.getElementById(
+    "migrationButton"
+  );
+
+const migrationProgress =
+  document.getElementById(
+    "migrationProgress"
+  );
 
 
 // =========================
@@ -1403,7 +1420,142 @@ async function refreshHome() {
 
   await renderRecent();
 
+  await checkLegacyDiaries();
+
+}
+
+// =========================
+// 기존 평문 기록 확인
+// =========================
+
+async function checkLegacyDiaries() {
+
+  try {
+
+    const diaries =
+      await getAllDiaries();
+
+
+    const legacyDiaries =
+      diaries.filter(
+        diary =>
+          Number(
+            diary.encryptionVersion
+          ) === 0
+      );
+
+
+    if (
+      legacyDiaries.length === 0
+    ) {
+
+      migrationBox.style.display =
+        "none";
+
+      return;
+
+    }
+
+
+    migrationBox.style.display =
+      "block";
+
+
+    migrationProgress.textContent =
+      `${legacyDiaries.length}개의 이전 기록이 암호화되지 않았습니다.`;
+
+
+  } catch (error) {
+
+    console.error(
+      "기존 기록 확인 오류:",
+      error
+    );
+
+  }
+
 }
 
 
+// =========================
+// 기존 기록 보안 업그레이드
+// =========================
 
+migrationButton.addEventListener(
+  "click",
+  async () => {
+
+    const confirmed =
+      confirm(
+        "기존 일기와 사진을 암호화할까요?\n\n" +
+        "암호화가 끝날 때까지 앱을 종료하지 않는 것을 권장합니다."
+      );
+
+
+    if (!confirmed) {
+      return;
+    }
+
+
+    migrationButton.disabled =
+      true;
+
+    migrationButton.textContent =
+      "암호화 중...";
+
+    migrationProgress.textContent =
+      "보안 업그레이드를 준비하고 있습니다.";
+
+
+    try {
+
+      const result =
+        await migrateLegacyDiaries(
+
+          progress => {
+
+            migrationProgress.textContent =
+              `${progress.current} / ${progress.total} 기록 암호화 중... ${progress.date}`;
+
+          }
+
+        );
+
+
+      migrationProgress.textContent =
+        "기존 기록 암호화가 완료되었습니다. 🔐";
+
+      migrationButton.textContent =
+        "업그레이드 완료";
+
+
+      await refreshHome();
+
+
+      alert(
+        `${result.migrated}개의 기존 기록을 안전하게 암호화했습니다.`
+      );
+
+
+    } catch (error) {
+
+      console.error(
+        "마이그레이션 오류:",
+        error
+      );
+
+
+      migrationProgress.textContent =
+        "일부 기록을 암호화하지 못했습니다. 다시 시도해주세요.";
+
+
+      migrationButton.disabled =
+        false;
+
+      migrationButton.textContent =
+        "보안 업그레이드 다시 시도";
+
+    }
+
+  }
+);
