@@ -1,33 +1,44 @@
 // =========================
+// My Diary - Supabase DB
+// E2EE 지원
+// =========================
+
+const PHOTO_BUCKET =
+  "diary-photos";
+
+
+// =========================
 // 현재 로그인 사용자
 // =========================
 
 async function getCurrentUser() {
 
   const {
-    data: { session },
+    data: { user },
     error
   } =
-    await supabaseClient.auth.getSession();
+    await supabaseClient.auth
+      .getUser();
 
 
   if (error) {
-
-    console.error(
-      "로그인 정보 확인 오류:",
-      error
-    );
-
-    return null;
+    throw error;
   }
 
 
-  return session?.user || null;
+  if (!user) {
+    throw new Error(
+      "로그인이 필요합니다."
+    );
+  }
+
+
+  return user;
 }
 
 
 // =========================
-// 일기 저장 / 수정
+// 일기 저장
 // =========================
 
 async function saveDiary(diary) {
@@ -36,10 +47,60 @@ async function saveDiary(diary) {
     await getCurrentUser();
 
 
-  if (!user) {
+  if (!getDiaryCryptoKey()) {
 
     throw new Error(
-      "로그인이 필요합니다."
+      "일기 잠금이 해제되지 않았습니다."
+    );
+  }
+
+
+  // 실제로 암호화할 데이터
+  const plainData = {
+
+    mood:
+      diary.mood || "",
+
+    title:
+      diary.title || "",
+
+    content:
+      diary.content || "",
+
+    photos:
+      diary.photos || []
+
+  };
+
+
+  // Master Key로 암호화
+  const encryptedPayload =
+    await encryptDiaryData(
+      plainData
+    );
+
+
+  // 저장하기 전에
+  // 실제로 다시 풀리는지 확인
+  const verify =
+    await decryptDiaryData(
+      encryptedPayload
+    );
+
+
+  if (
+    verify.title !==
+      plainData.title ||
+
+    verify.content !==
+      plainData.content ||
+
+    verify.mood !==
+      plainData.mood
+  ) {
+
+    throw new Error(
+      "암호화 검증에 실패했습니다."
     );
 
   }
@@ -52,43 +113,149 @@ async function saveDiary(diary) {
       .from("diaries")
       .upsert(
         {
+
           user_id:
             user.id,
 
           diary_date:
             diary.date,
 
+          // ==================
+          // 평문은 서버에
+          // 남기지 않음
+          // ==================
+
           mood:
-            diary.mood || "",
+            null,
 
           title:
-            diary.title || "",
+            null,
 
           content:
-            diary.content || "",
+            null,
 
           photos:
-            diary.photos || [],
+            [],
+
+
+          // ==================
+          // 실제 저장 데이터
+          // ==================
+
+          encrypted_payload:
+            encryptedPayload,
+
+          encryption_version:
+            1,
 
           updated_at:
-            new Date().toISOString()
+            new Date()
+              .toISOString()
+
         },
+
         {
           onConflict:
             "user_id,diary_date"
         }
+
       );
 
 
   if (error) {
 
-    console.error(
-      "일기 저장 오류:",
-      error
-    );
-
     throw error;
+
   }
+
+
+  return true;
+}
+
+
+// =========================
+// DB 행 → 앱에서 쓰는 일기
+// =========================
+
+async function convertDiaryRow(
+  row
+) {
+
+  if (!row) {
+
+    return null;
+
+  }
+
+
+  // =========================
+  // 암호화된 새 일기
+  // =========================
+
+  if (
+    Number(
+      row.encryption_version
+    ) >= 1 &&
+    row.encrypted_payload
+  ) {
+
+    const decrypted =
+      await decryptDiaryData(
+        row.encrypted_payload
+      );
+
+
+    return {
+
+      date:
+        row.diary_date,
+
+      mood:
+        decrypted.mood || "",
+
+      title:
+        decrypted.title || "",
+
+      content:
+        decrypted.content || "",
+
+      photos:
+        decrypted.photos || [],
+
+      encryptionVersion:
+        row.encryption_version
+
+    };
+
+  }
+
+
+  // =========================
+  // 예전 평문 일기
+  // 아직 마이그레이션 전
+  // =========================
+
+  return {
+
+    date:
+      row.diary_date,
+
+    mood:
+      row.mood || "",
+
+    title:
+      row.title || "",
+
+    content:
+      row.content || "",
+
+    photos:
+      row.photos || [],
+
+    encryptionVersion:
+      0
+
+  };
 
 }
 
@@ -103,18 +270,23 @@ async function getDiary(date) {
     await getCurrentUser();
 
 
-  if (!user) {
-    return null;
-  }
-
-
   const {
     data,
     error
   } =
     await supabaseClient
       .from("diaries")
-      .select("*")
+      .select(
+        `
+        diary_date,
+        mood,
+        title,
+        content,
+        photos,
+        encrypted_payload,
+        encryption_version
+        `
+      )
       .eq(
         "user_id",
         user.id
@@ -128,55 +300,25 @@ async function getDiary(date) {
 
   if (error) {
 
-    console.error(
-      "일기 불러오기 오류:",
-      error
-    );
-
     throw error;
+
   }
 
 
-  if (!data) {
-    return null;
-  }
-
-
-  return {
-
-    date:
-      data.diary_date,
-
-    mood:
-      data.mood || "",
-
-    title:
-      data.title || "",
-
-    content:
-      data.content || "",
-
-    photos:
-      data.photos || []
-
-  };
-
+  return await convertDiaryRow(
+    data
+  );
 }
 
 
 // =========================
-// 전체 일기
+// 모든 일기
 // =========================
 
 async function getAllDiaries() {
 
   const user =
     await getCurrentUser();
-
-
-  if (!user) {
-    return [];
-  }
 
 
   const {
@@ -186,7 +328,15 @@ async function getAllDiaries() {
     await supabaseClient
       .from("diaries")
       .select(
-        "diary_date, mood, title, content, photos, updated_at"
+        `
+        diary_date,
+        mood,
+        title,
+        content,
+        photos,
+        encrypted_payload,
+        encryption_version
+        `
       )
       .eq(
         "user_id",
@@ -195,50 +345,49 @@ async function getAllDiaries() {
       .order(
         "diary_date",
         {
-          ascending: false
+          ascending:
+            false
         }
       );
 
 
   if (error) {
 
-    console.error(
-      "전체 일기 불러오기 오류:",
-      error
-    );
-
     throw error;
+
   }
 
 
-  return (
-    data || []
-  ).map(
-    diary => ({
+  const diaries = [];
 
-      date:
-        diary.diary_date,
 
-      mood:
-        diary.mood || "",
+  for (
+    const row of data || []
+  ) {
 
-      title:
-        diary.title || "",
+    const diary =
+      await convertDiaryRow(
+        row
+      );
 
-      content:
-        diary.content || "",
+    diaries.push(
+      diary
+    );
 
-      photos:
-        diary.photos || []
+  }
 
-    })
-  );
 
+  return diaries;
 }
 
 
 // =========================
-// 원본 사진 업로드
+// 사진 업로드
+//
+// 주의:
+// 현재는 아직 원본 사진 업로드.
+// 다음 단계에서 사진 자체도
+// AES-GCM으로 암호화할 예정.
 // =========================
 
 async function uploadDiaryPhoto(
@@ -250,76 +399,32 @@ async function uploadDiaryPhoto(
     await getCurrentUser();
 
 
-  if (!user) {
-
-    throw new Error(
-      "로그인이 필요합니다."
-    );
-
-  }
+  const originalName =
+    file.name || "photo";
 
 
-  // 원본 파일 확장자 가져오기
-  let extension = "";
-
-  if (
-    file.name &&
-    file.name.includes(".")
-  ) {
-
-    extension =
-      file.name
-        .split(".")
-        .pop()
-        .toLowerCase()
-        .replace(
-          /[^a-z0-9]/g,
-          ""
-        );
-
-  }
+  const extension =
+    originalName.includes(".")
+      ? originalName
+          .split(".")
+          .pop()
+      : "jpg";
 
 
-  // 같은 이름 사진 충돌 방지
-  let uniqueId;
-
-  if (
-    window.crypto &&
-    crypto.randomUUID
-  ) {
-
-    uniqueId =
-      crypto.randomUUID();
-
-  } else {
-
-    uniqueId =
-      `${Date.now()}-${Math.random()
-        .toString(36)
-        .slice(2)}`;
-
-  }
+  const randomName =
+    crypto.randomUUID();
 
 
-  const storageFileName =
-    extension
-      ? `${uniqueId}.${extension}`
-      : uniqueId;
-
-
-  // 사용자ID / 날짜 / 파일
   const path =
-    `${user.id}/${date}/${storageFileName}`;
+    `${user.id}/${date}/${randomName}.${extension}`;
 
 
   const {
-    data,
     error
   } =
-    await supabaseClient
-      .storage
+    await supabaseClient.storage
       .from(
-        "diary-photos"
+        PHOTO_BUCKET
       )
       .upload(
         path,
@@ -337,22 +442,18 @@ async function uploadDiaryPhoto(
 
   if (error) {
 
-    console.error(
-      "사진 업로드 오류:",
-      error
-    );
-
     throw error;
+
   }
 
 
   return {
 
-    name:
-      file.name,
-
     path:
-      data.path,
+      path,
+
+    name:
+      originalName,
 
     type:
       file.type,
@@ -361,26 +462,31 @@ async function uploadDiaryPhoto(
       file.size
 
   };
-
 }
 
 
 // =========================
-// 비공개 사진 보기용 주소
+// 사진 임시 URL
 // =========================
 
 async function getSignedPhotoUrl(
   path
 ) {
 
+  if (!path) {
+
+    return null;
+
+  }
+
+
   const {
     data,
     error
   } =
-    await supabaseClient
-      .storage
+    await supabaseClient.storage
       .from(
-        "diary-photos"
+        PHOTO_BUCKET
       )
       .createSignedUrl(
         path,
@@ -390,17 +496,12 @@ async function getSignedPhotoUrl(
 
   if (error) {
 
-    console.error(
-      "사진 주소 생성 오류:",
-      error
-    );
+    throw error;
 
-    return null;
   }
 
 
   return data.signedUrl;
-
 }
 
 
@@ -418,69 +519,88 @@ async function deleteDiaryPhotos(
   ) {
 
     return;
+
+  }
+
+
+  const validPaths =
+    paths
+      .map(item => {
+
+        if (
+          typeof item ===
+          "string"
+        ) {
+
+          return item;
+
+        }
+
+        return item?.path;
+
+      })
+      .filter(Boolean);
+
+
+  if (
+    validPaths.length === 0
+  ) {
+
+    return;
+
   }
 
 
   const {
     error
   } =
-    await supabaseClient
-      .storage
+    await supabaseClient.storage
       .from(
-        "diary-photos"
+        PHOTO_BUCKET
       )
       .remove(
-        paths
+        validPaths
       );
 
 
   if (error) {
 
-    console.error(
-      "사진 삭제 오류:",
-      error
-    );
-
     throw error;
+
   }
 
 }
 
 
 // =========================
-// 일기 전체 삭제
-// 글 + 사진
+// 일기 삭제
 // =========================
 
-async function deleteDiary(date) {
+async function deleteDiary(
+  date
+) {
 
   const user =
     await getCurrentUser();
 
 
-  if (!user) {
-
-    throw new Error(
-      "로그인이 필요합니다."
-    );
-
-  }
-
-
-  // 삭제 전에 사진 목록 확인
+  // 먼저 사진 목록 확인
   const diary =
-    await getDiary(date);
+    await getDiary(
+      date
+    );
 
 
   const photoPaths =
     (diary?.photos || [])
       .map(
-        photo => photo.path
+        photo =>
+          photo?.path
       )
       .filter(Boolean);
 
 
-  // 먼저 일기 DB 삭제
+  // DB 삭제
   const {
     error
   } =
@@ -499,35 +619,22 @@ async function deleteDiary(date) {
 
   if (error) {
 
-    console.error(
-      "일기 삭제 오류:",
-      error
-    );
-
     throw error;
+
   }
 
 
-  // 연결된 사진도 삭제
+  // 연결된 사진 삭제
   if (
     photoPaths.length > 0
   ) {
 
-    try {
-
-      await deleteDiaryPhotos(
-        photoPaths
-      );
-
-    } catch (error) {
-
-      console.warn(
-        "일기는 삭제됐지만 일부 사진 삭제에 실패했습니다.",
-        error
-      );
-
-    }
+    await deleteDiaryPhotos(
+      photoPaths
+    );
 
   }
 
+
+  return true;
 }
