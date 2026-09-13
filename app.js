@@ -722,22 +722,29 @@ saveButton.addEventListener(
           )
 
           .map(
-            photo => ({
+  photo => ({
+    name:
+      photo.name,
 
-              name:
-                photo.name,
+    path:
+      photo.path,
 
-              path:
-                photo.path,
+    type:
+      photo.type,
 
-              type:
-                photo.type,
+    size:
+      photo.size,
 
-              size:
-                photo.size
+    iv:
+      photo.iv,
 
-            })
-          );
+    encrypted:
+      photo.encrypted,
+
+    version:
+      photo.version
+  })
+);
 
 
       // =====================
