@@ -46,41 +46,56 @@ const userEmail =
   document.getElementById("userEmail");
 
 
-// 중복 실행 방지
-let authProcessing = false;
-
-
 // =========================
-// 화면 표시
+// 로그인 화면
 // =========================
 
 function showLogin() {
 
-  loginScreen.style.display = "flex";
+  loginScreen.style.display =
+    "flex";
 
-  cryptoScreen.style.display = "none";
+  cryptoScreen.style.display =
+    "none";
 
-  diaryApp.style.display = "none";
+  diaryApp.style.display =
+    "none";
+
 }
 
+
+// =========================
+// 암호 화면
+// =========================
 
 function showCryptoScreen() {
 
-  loginScreen.style.display = "none";
+  loginScreen.style.display =
+    "none";
 
-  cryptoScreen.style.display = "flex";
+  cryptoScreen.style.display =
+    "flex";
 
-  diaryApp.style.display = "none";
+  diaryApp.style.display =
+    "none";
+
 }
 
 
+// =========================
+// 일기 메인 화면
+// =========================
+
 async function showDiary(session) {
 
-  loginScreen.style.display = "none";
+  loginScreen.style.display =
+    "none";
 
-  cryptoScreen.style.display = "none";
+  cryptoScreen.style.display =
+    "none";
 
-  diaryApp.style.display = "block";
+  diaryApp.style.display =
+    "block";
 
 
   if (session?.user?.email) {
@@ -91,20 +106,20 @@ async function showDiary(session) {
   }
 
 
-  // 로그인 + 일기 잠금 해제 이후에만
-  // 실제 일기를 불러옴
   if (
-    typeof refreshHome === "function"
+    typeof refreshHome ===
+    "function"
   ) {
 
     await refreshHome();
 
   }
+
 }
 
 
 // =========================
-// 로그인된 사용자 처리
+// 로그인 성공한 사용자 처리
 // =========================
 
 async function handleLoggedInUser(
@@ -117,10 +132,20 @@ async function handleLoggedInUser(
   ) {
 
     showLogin();
+
     return;
+
   }
 
 
+  console.log(
+    "로그인 성공:",
+    session.user.email
+  );
+
+
+  // Google 로그인 성공 후
+  // 반드시 일기 암호 화면으로 이동
   showCryptoScreen();
 
 
@@ -138,7 +163,7 @@ async function handleLoggedInUser(
     } catch (error) {
 
       console.error(
-        "암호 화면 준비 오류:",
+        "암호 화면 오류:",
         error
       );
 
@@ -151,10 +176,11 @@ async function handleLoggedInUser(
   } else {
 
     console.error(
-      "prepareCryptoScreen 함수를 찾을 수 없습니다. crypto.js를 확인하세요."
+      "crypto.js의 prepareCryptoScreen을 찾을 수 없습니다."
     );
 
   }
+
 }
 
 
@@ -166,13 +192,8 @@ googleLoginBtn.addEventListener(
   "click",
   async () => {
 
-    if (authProcessing) {
-      return;
-    }
-
-    authProcessing = true;
-
-    googleLoginBtn.disabled = true;
+    googleLoginBtn.disabled =
+      true;
 
     googleLoginBtn.textContent =
       "Google 로그인 중...";
@@ -186,7 +207,7 @@ googleLoginBtn.addEventListener(
 
 
       console.log(
-        "로그인 후 돌아올 주소:",
+        "돌아올 주소:",
         redirectUrl
       );
 
@@ -194,14 +215,17 @@ googleLoginBtn.addEventListener(
       const {
         error
       } =
-        await supabaseClient.auth
+        await supabaseClient
+          .auth
           .signInWithOAuth({
 
             provider: "google",
 
             options: {
+
               redirectTo:
                 redirectUrl
+
             }
 
           });
@@ -221,19 +245,19 @@ googleLoginBtn.addEventListener(
         error
       );
 
+
       alert(
         "Google 로그인에 실패했습니다.\n" +
         error.message
       );
 
 
-      authProcessing = false;
-
       googleLoginBtn.disabled =
         false;
 
       googleLoginBtn.textContent =
         "G  Google로 계속하기";
+
     }
 
   }
@@ -261,7 +285,8 @@ logoutBtn.addEventListener(
     const {
       error
     } =
-      await supabaseClient.auth
+      await supabaseClient
+        .auth
         .signOut();
 
 
@@ -270,14 +295,16 @@ logoutBtn.addEventListener(
       console.error(error);
 
       alert(
-        "로그아웃에 실패했습니다."
+        "로그아웃 중 문제가 발생했습니다."
       );
 
       return;
+
     }
 
 
-    userEmail.textContent = "";
+    userEmail.textContent =
+      "";
 
     showLogin();
 
@@ -286,13 +313,14 @@ logoutBtn.addEventListener(
 
 
 // =========================
-// 앱 최초 실행
+// 처음 앱 열었을 때
+// 기존 로그인 확인
 // =========================
 
 async function initializeAuth() {
 
   console.log(
-    "로그인 상태 확인 시작"
+    "기존 로그인 상태 확인"
   );
 
 
@@ -302,12 +330,15 @@ async function initializeAuth() {
       data: { session },
       error
     } =
-      await supabaseClient.auth
+      await supabaseClient
+        .auth
         .getSession();
 
 
     if (error) {
+
       throw error;
+
     }
 
 
@@ -333,21 +364,11 @@ async function initializeAuth() {
   } catch (error) {
 
     console.error(
-      "로그인 확인 오류:",
+      "세션 확인 오류:",
       error
     );
 
     showLogin();
-
-  } finally {
-
-    authProcessing = false;
-
-    googleLoginBtn.disabled =
-      false;
-
-    googleLoginBtn.textContent =
-      "G  Google로 계속하기";
 
   }
 
@@ -362,11 +383,59 @@ supabaseClient.auth.onAuthStateChange(
   (event, session) => {
 
     console.log(
-      "Auth 상태:",
+      "Supabase Auth:",
       event
     );
 
 
+    // Google 로그인 완료
+    if (
+      event === "SIGNED_IN" &&
+      session
+    ) {
+
+      // auth callback 안에서
+      // 바로 DB 요청하지 않고
+      // 다음 실행 순서로 넘김
+      setTimeout(
+        () => {
+
+          handleLoggedInUser(
+            session
+          );
+
+        },
+        0
+      );
+
+      return;
+
+    }
+
+
+    // 이미 로그인된 상태로 앱 시작
+    if (
+      event === "INITIAL_SESSION" &&
+      session
+    ) {
+
+      setTimeout(
+        () => {
+
+          handleLoggedInUser(
+            session
+          );
+
+        },
+        0
+      );
+
+      return;
+
+    }
+
+
+    // 로그아웃
     if (
       event === "SIGNED_OUT"
     ) {
@@ -380,7 +449,7 @@ supabaseClient.auth.onAuthStateChange(
 
 
 // =========================
-// 페이지 전체 로딩 후 실행
+// 시작
 // =========================
 
 window.addEventListener(
