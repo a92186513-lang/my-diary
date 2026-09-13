@@ -572,7 +572,7 @@ async function openEditor(
       );
 
 
-      // =====================
+           // =====================
       // 클라우드 사진 불러오기
       // =====================
 
@@ -589,37 +589,40 @@ async function openEditor(
           await getDiaryPhotoUrl(
             photo
           );
-         
 
 
         cloudPhotos.push({
-  source:
-    "cloud",
 
-  name:
-    photo.name,
+          source:
+            "cloud",
 
-  path:
-    photo.path,
+          name:
+            photo.name,
 
-  type:
-    photo.type,
+          path:
+            photo.path,
 
-  size:
-    photo.size,
+          type:
+            photo.type,
 
-  iv:
-    photo.iv,
+          size:
+            photo.size,
 
-  encrypted:
-    photo.encrypted,
+          iv:
+            photo.iv,
 
-  version:
-    photo.version,
+          encrypted:
+            photo.encrypted,
 
-  url:
-    signedUrl
-});
+          version:
+            photo.version,
+
+          url:
+            signedUrl
+
+        });
+
+      }
 
 
       selectedPhotos =
