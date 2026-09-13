@@ -1,4 +1,4 @@
-const CACHE_NAME = "my-diary-v9";
+const CACHE_NAME = "my-diary-v10";
 
 const FILES_TO_CACHE = [
   "./",

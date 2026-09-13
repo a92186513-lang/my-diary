@@ -1234,11 +1234,11 @@ async function prepareCryptoScreen(
 
 
         if (
-          password.length < 12
+          password.length < 4
         ) {
 
           message.textContent =
-            "암호는 최소 12자 이상으로 만들어주세요.";
+            "암호는 최소 4자 이상으로 만들어주세요.";
 
           return;
 
@@ -1576,11 +1576,11 @@ async function prepareCryptoScreen(
 
 
       if (
-        newPassword.length < 12
+        newPassword.length < 4
       ) {
 
         message.textContent =
-          "새 암호는 최소 12자 이상으로 만들어주세요.";
+          "새 암호는 최소 4자 이상으로 만들어주세요.";
 
         return;
 
