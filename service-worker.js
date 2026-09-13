@@ -1,13 +1,13 @@
-const CACHE_NAME = "my-diary-v20";
+const CACHE_NAME = "my-diary-v21";
 
 const FILES_TO_CACHE = [
   "./",
   "./index.html",
-  "./style.css",
-  "./auth.js",
-  "./crypto.js",
-  "./db.js",
-  "./app.js",
+  "./style.css?v=21",
+  "./auth.js?v=21",
+  "./crypto.js?v=21",
+  "./db.js?v=21",
+  "./app.js?v=21",
   "./manifest.json",
   "./icon-192.png",
   "./icon-512.png"
