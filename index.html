@@ -75,7 +75,6 @@
   class="login-screen"
   style="display: none;"
 >
-
   <div class="login-box">
 
     <p class="login-small-title">
@@ -89,34 +88,91 @@
     <p
       id="cryptoDescription"
       class="login-description"
+    ></p>
+
+
+    <!-- 일반 암호 입력 -->
+    <div id="passwordPanel">
+
+      <input
+        id="cryptoPassword"
+        type="password"
+        placeholder="일기 암호"
+        autocomplete="current-password"
+      >
+
+      <input
+        id="cryptoPasswordConfirm"
+        type="password"
+        placeholder="일기 암호 확인"
+        autocomplete="new-password"
+        style="margin-top: 10px;"
+      >
+
+      <button
+        id="cryptoButton"
+        class="google-login-button"
+      >
+        계속
+      </button>
+
+      <button
+        id="recoveryModeBtn"
+        class="secondary-text-button"
+        type="button"
+        style="display: none;"
+      >
+        암호를 잊으셨나요? 복구키 사용
+      </button>
+
+    </div>
+
+
+    <!-- 복구키로 비밀번호 재설정 -->
+    <div
+      id="recoveryResetPanel"
+      style="display: none;"
     >
-      일기를 보호할 암호를 입력하세요.
-    </p>
 
+      <input
+        id="recoveryKeyInput"
+        type="text"
+        placeholder="복구키 입력"
+        autocomplete="off"
+      >
 
-    <input
-      id="cryptoPassword"
-      type="password"
-      placeholder="일기 암호"
-      autocomplete="new-password"
-    >
+      <input
+        id="newDiaryPassword"
+        type="password"
+        placeholder="새 일기 암호"
+        autocomplete="new-password"
+        style="margin-top: 10px;"
+      >
 
+      <input
+        id="newDiaryPasswordConfirm"
+        type="password"
+        placeholder="새 일기 암호 확인"
+        autocomplete="new-password"
+        style="margin-top: 10px;"
+      >
 
-    <input
-      id="cryptoPasswordConfirm"
-      type="password"
-      placeholder="일기 암호 확인"
-      autocomplete="new-password"
-      style="margin-top: 10px;"
-    >
+      <button
+        id="recoveryResetButton"
+        class="google-login-button"
+      >
+        새 암호 설정
+      </button>
 
+      <button
+        id="backToPasswordBtn"
+        class="secondary-text-button"
+        type="button"
+      >
+        암호 입력으로 돌아가기
+      </button>
 
-    <button
-      id="cryptoButton"
-      class="google-login-button"
-    >
-      계속
-    </button>
+    </div>
 
 
     <p
@@ -124,8 +180,59 @@
       class="crypto-message"
     ></p>
 
-  </div>
 
+    <!-- 복구키 최초 표시 -->
+    <div
+      id="recoveryPanel"
+      class="recovery-panel"
+      style="display: none;"
+    >
+
+      <h2>
+        복구키를 저장하세요
+      </h2>
+
+      <p>
+        일기 암호를 잊었을 때 필요한
+        유일한 복구 수단입니다.
+        운영자는 이 키를 보관하지 않습니다.
+      </p>
+
+      <div
+        id="recoveryKeyText"
+        class="recovery-key"
+      ></div>
+
+      <button
+        id="copyRecoveryKeyBtn"
+        class="recovery-copy-button"
+        type="button"
+      >
+        복구키 복사
+      </button>
+
+      <label class="recovery-check">
+
+        <input
+          id="recoverySavedCheck"
+          type="checkbox"
+        >
+
+        복구키를 안전한 곳에 저장했습니다.
+
+      </label>
+
+      <button
+        id="recoveryContinueBtn"
+        class="google-login-button"
+        disabled
+      >
+        저장했어요, 계속
+      </button>
+
+    </div>
+
+  </div>
 </section>
 
 

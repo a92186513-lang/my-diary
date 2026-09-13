@@ -1,24 +1,59 @@
 // =========================
-// My Diary 암호화
+// My Diary E2EE
+// Master Key + Recovery Key
 // =========================
 
-const textEncoder = new TextEncoder();
-const textDecoder = new TextDecoder();
+const textEncoder =
+  new TextEncoder();
 
-let diaryCryptoKey = null;
+const textDecoder =
+  new TextDecoder();
+
+const KDF_ITERATIONS =
+  310000;
+
+const V1_CHECK_TEXT =
+  "MY_DIARY_KEY_CHECK_V1";
+
+const V2_CHECK_TEXT =
+  "MY_DIARY_KEY_CHECK_V2";
+
+
+// 실제 일기를 여는 Master Key
+// 메모리에만 존재
+let diaryCryptoKey =
+  null;
 
 
 // =========================
-// Base64 변환
+// Base64
 // =========================
 
 function bytesToBase64(bytes) {
 
   let binary = "";
 
-  bytes.forEach(byte => {
-    binary += String.fromCharCode(byte);
-  });
+  const chunkSize =
+    0x8000;
+
+  for (
+    let i = 0;
+    i < bytes.length;
+    i += chunkSize
+  ) {
+
+    const chunk =
+      bytes.subarray(
+        i,
+        i + chunkSize
+      );
+
+    binary +=
+      String.fromCharCode(
+        ...chunk
+      );
+
+  }
 
   return btoa(binary);
 }
@@ -30,7 +65,9 @@ function base64ToBytes(base64) {
     atob(base64);
 
   const bytes =
-    new Uint8Array(binary.length);
+    new Uint8Array(
+      binary.length
+    );
 
   for (
     let i = 0;
@@ -48,38 +85,117 @@ function base64ToBytes(base64) {
 
 
 // =========================
-// 비밀번호 → AES 키
+// Base64 URL
+// 복구키용
 // =========================
 
-async function deriveDiaryKey(
+function bytesToBase64Url(bytes) {
+
+  return bytesToBase64(bytes)
+    .replace(/\+/g, "-")
+    .replace(/\//g, "_")
+    .replace(/=+$/g, "");
+}
+
+
+function base64UrlToBytes(value) {
+
+  let normalized =
+    value
+      .replace(/\s/g, "")
+      .replace(/-/g, "+")
+      .replace(/_/g, "/");
+
+
+  while (
+    normalized.length % 4
+  ) {
+
+    normalized += "=";
+
+  }
+
+
+  return base64ToBytes(
+    normalized
+  );
+}
+
+
+function formatRecoveryKey(
+  value
+) {
+
+  return (
+    value.match(/.{1,5}/g)
+      ?.join(" ") ||
+    value
+  );
+
+}
+
+
+// =========================
+// 난수
+// =========================
+
+function randomBytes(length) {
+
+  return crypto.getRandomValues(
+    new Uint8Array(length)
+  );
+
+}
+
+
+// =========================
+// 비밀번호 → 키
+// =========================
+
+async function derivePasswordKey(
   password,
   salt,
   iterations
 ) {
 
-  const passwordKey =
+  const material =
     await crypto.subtle.importKey(
       "raw",
-      textEncoder.encode(password),
+      textEncoder.encode(
+        password
+      ),
       "PBKDF2",
       false,
-      ["deriveKey"]
+      [
+        "deriveKey"
+      ]
     );
 
 
-  return await crypto.subtle.deriveKey(
+  return crypto.subtle.deriveKey(
+
     {
-      name: "PBKDF2",
-      salt: salt,
-      iterations: iterations,
-      hash: "SHA-256"
+      name:
+        "PBKDF2",
+
+      salt:
+        salt,
+
+      iterations:
+        iterations,
+
+      hash:
+        "SHA-256"
     },
 
-    passwordKey,
+    material,
 
     {
-      name: "AES-GCM",
-      length: 256
+      name:
+        "AES-GCM",
+
+      length:
+        256
     },
 
     false,
@@ -88,35 +204,65 @@ async function deriveDiaryKey(
       "encrypt",
       "decrypt"
     ]
+
   );
+
 }
 
 
 // =========================
-// 텍스트 암호화
+// Raw 32byte → AES Key
 // =========================
 
-async function encryptText(
-  text,
+async function importAesKey(
+  rawBytes
+) {
+
+  return crypto.subtle.importKey(
+    "raw",
+    rawBytes,
+    {
+      name:
+        "AES-GCM"
+    },
+    false,
+    [
+      "encrypt",
+      "decrypt"
+    ]
+  );
+
+}
+
+
+// =========================
+// Bytes 암호화
+// =========================
+
+async function encryptBytes(
+  bytes,
   key
 ) {
 
   const iv =
-    crypto.getRandomValues(
-      new Uint8Array(12)
-    );
+    randomBytes(12);
 
 
   const encrypted =
     await crypto.subtle.encrypt(
+
       {
-        name: "AES-GCM",
-        iv: iv
+        name:
+          "AES-GCM",
+
+        iv:
+          iv
       },
 
       key,
 
-      textEncoder.encode(text)
+      bytes
+
     );
 
 
@@ -127,18 +273,21 @@ async function encryptText(
 
     ciphertext:
       bytesToBase64(
-        new Uint8Array(encrypted)
+        new Uint8Array(
+          encrypted
+        )
       )
 
   };
+
 }
 
 
 // =========================
-// 텍스트 복호화
+// Bytes 복호화
 // =========================
 
-async function decryptText(
+async function decryptBytes(
   payload,
   key
 ) {
@@ -148,8 +297,7 @@ async function decryptText(
       payload.iv
     );
 
-
-  const encrypted =
+  const ciphertext =
     base64ToBytes(
       payload.ciphertext
     );
@@ -157,35 +305,96 @@ async function decryptText(
 
   const decrypted =
     await crypto.subtle.decrypt(
+
       {
-        name: "AES-GCM",
-        iv: iv
+        name:
+          "AES-GCM",
+
+        iv:
+          iv
       },
 
       key,
 
-      encrypted
+      ciphertext
+
     );
 
 
-  return textDecoder.decode(
+  return new Uint8Array(
     decrypted
   );
+
 }
 
 
 // =========================
-// 현재 암호화 키
+// Text 암호화
+// =========================
+
+async function encryptText(
+  text,
+  key
+) {
+
+  return encryptBytes(
+    textEncoder.encode(
+      text
+    ),
+    key
+  );
+
+}
+
+
+// =========================
+// Text 복호화
+// =========================
+
+async function decryptText(
+  payload,
+  key
+) {
+
+  const bytes =
+    await decryptBytes(
+      payload,
+      key
+    );
+
+
+  return textDecoder.decode(
+    bytes
+  );
+
+}
+
+
+// =========================
+// Master Key 가져오기
 // =========================
 
 function getDiaryCryptoKey() {
 
   return diaryCryptoKey;
+
 }
 
 
 // =========================
-// 암호 프로필 확인
+// 로그아웃 시 Master Key 제거
+// =========================
+
+function clearDiaryCryptoKey() {
+
+  diaryCryptoKey =
+    null;
+
+}
+
+
+// =========================
+// 프로필 가져오기
 // =========================
 
 async function getCryptoProfile(
@@ -197,7 +406,9 @@ async function getCryptoProfile(
     error
   } =
     await supabaseClient
-      .from("crypto_profiles")
+      .from(
+        "crypto_profiles"
+      )
       .select("*")
       .eq(
         "user_id",
@@ -207,47 +418,75 @@ async function getCryptoProfile(
 
 
   if (error) {
+
     throw error;
+
   }
 
 
   return data;
+
 }
 
 
 // =========================
-// 최초 암호 생성
+// V2 신규 암호 생성
 // =========================
 
-async function createDiaryPassword(
+async function createV2Profile(
   user,
   password
 ) {
 
   const salt =
-    crypto.getRandomValues(
-      new Uint8Array(16)
-    );
+    randomBytes(16);
 
 
-  const iterations =
-    310000;
+  // 실제 일기용 랜덤 Master Key
+  const masterKeyBytes =
+    randomBytes(32);
 
 
-  const key =
-    await deriveDiaryKey(
+  // 사용자에게 전달할 Recovery Key
+  const recoveryKeyBytes =
+    randomBytes(32);
+
+
+  const passwordKey =
+    await derivePasswordKey(
       password,
       salt,
-      iterations
+      KDF_ITERATIONS
     );
 
 
-  // 비밀번호가 맞는지
-  // 나중에 확인하기 위한 데이터
+  const recoveryKey =
+    await importAesKey(
+      recoveryKeyBytes
+    );
+
+
+  // Master Key를 비밀번호로 잠금
+  const passwordWrappedKey =
+    await encryptBytes(
+      masterKeyBytes,
+      passwordKey
+    );
+
+
+  // 같은 Master Key를 복구키로도 잠금
+  const recoveryWrappedKey =
+    await encryptBytes(
+      masterKeyBytes,
+      recoveryKey
+    );
+
+
+  // 비밀번호 검증용
   const checkPayload =
     await encryptText(
-      "MY_DIARY_KEY_CHECK_V1",
-      key
+      V2_CHECK_TEXT,
+      passwordKey
     );
 
 
@@ -255,55 +494,132 @@ async function createDiaryPassword(
     error
   } =
     await supabaseClient
-      .from("crypto_profiles")
+      .from(
+        "crypto_profiles"
+      )
       .insert({
+
         user_id:
           user.id,
 
         salt_b64:
-          bytesToBase64(salt),
+          bytesToBase64(
+            salt
+          ),
 
         check_payload:
           checkPayload,
 
         kdf_iterations:
-          iterations
+          KDF_ITERATIONS,
+
+        password_wrapped_key:
+          passwordWrappedKey,
+
+        recovery_wrapped_key:
+          recoveryWrappedKey,
+
+        crypto_version:
+          2
+
       });
 
 
   if (error) {
+
     throw error;
+
   }
 
 
   diaryCryptoKey =
-    key;
+    await importAesKey(
+      masterKeyBytes
+    );
 
 
-  return true;
+  const recoveryString =
+    bytesToBase64Url(
+      recoveryKeyBytes
+    );
+
+
+  return formatRecoveryKey(
+    recoveryString
+  );
+
 }
 
 
 // =========================
-// 기존 암호로 잠금 해제
+// 기존 V1 암호 확인
 // =========================
 
-async function unlockDiary(
-  user,
+async function verifyV1Password(
+  profile,
   password
 ) {
 
-  const profile =
-    await getCryptoProfile(
-      user.id
+  try {
+
+    const salt =
+      base64ToBytes(
+        profile.salt_b64
+      );
+
+
+    const passwordKey =
+      await derivePasswordKey(
+        password,
+        salt,
+        profile.kdf_iterations
+      );
+
+
+    const check =
+      await decryptText(
+        profile.check_payload,
+        passwordKey
+      );
+
+
+    return (
+      check ===
+      V1_CHECK_TEXT
     );
 
 
-  if (!profile) {
+  } catch {
 
-    throw new Error(
-      "암호화 설정을 찾을 수 없습니다."
+    return false;
+
+  }
+
+}
+
+
+// =========================
+// V1 → V2 업그레이드
+// =========================
+
+async function upgradeV1ToV2(
+  user,
+  profile,
+  password
+) {
+
+  const valid =
+    await verifyV1Password(
+      profile,
+      password
     );
+
+
+  if (!valid) {
+
+    return {
+      success: false
+    };
 
   }
 
@@ -314,26 +630,144 @@ async function unlockDiary(
     );
 
 
-  const key =
-    await deriveDiaryKey(
+  const passwordKey =
+    await derivePasswordKey(
       password,
       salt,
       profile.kdf_iterations
     );
 
 
+  const masterKeyBytes =
+    randomBytes(32);
+
+
+  const recoveryKeyBytes =
+    randomBytes(32);
+
+
+  const recoveryKey =
+    await importAesKey(
+      recoveryKeyBytes
+    );
+
+
+  const passwordWrappedKey =
+    await encryptBytes(
+      masterKeyBytes,
+      passwordKey
+    );
+
+
+  const recoveryWrappedKey =
+    await encryptBytes(
+      masterKeyBytes,
+      recoveryKey
+    );
+
+
+  const checkPayload =
+    await encryptText(
+      V2_CHECK_TEXT,
+      passwordKey
+    );
+
+
+  const {
+    error
+  } =
+    await supabaseClient
+      .from(
+        "crypto_profiles"
+      )
+      .update({
+
+        check_payload:
+          checkPayload,
+
+        password_wrapped_key:
+          passwordWrappedKey,
+
+        recovery_wrapped_key:
+          recoveryWrappedKey,
+
+        crypto_version:
+          2,
+
+        updated_at:
+          new Date()
+            .toISOString()
+
+      })
+      .eq(
+        "user_id",
+        user.id
+      );
+
+
+  if (error) {
+
+    throw error;
+
+  }
+
+
+  diaryCryptoKey =
+    await importAesKey(
+      masterKeyBytes
+    );
+
+
+  return {
+
+    success: true,
+
+    recoveryKey:
+      formatRecoveryKey(
+        bytesToBase64Url(
+          recoveryKeyBytes
+        )
+      )
+
+  };
+
+}
+
+
+// =========================
+// V2 일반 암호로 잠금 해제
+// =========================
+
+async function unlockV2(
+  profile,
+  password
+) {
+
   try {
 
-    const checkText =
-      await decryptText(
-        profile.check_payload,
-        key
+    const salt =
+      base64ToBytes(
+        profile.salt_b64
+      );
+
+
+    const passwordKey =
+      await derivePasswordKey(
+        password,
+        salt,
+        profile.kdf_iterations
+      );
+
+
+    const masterKeyBytes =
+      await decryptBytes(
+        profile.password_wrapped_key,
+        passwordKey
       );
 
 
     if (
-      checkText !==
-      "MY_DIARY_KEY_CHECK_V1"
+      masterKeyBytes.length !== 32
     ) {
 
       return false;
@@ -342,7 +776,9 @@ async function unlockDiary(
 
 
     diaryCryptoKey =
-      key;
+      await importAesKey(
+        masterKeyBytes
+      );
 
 
     return true;
@@ -353,34 +789,341 @@ async function unlockDiary(
     return false;
 
   }
+
+}
+
+
+// =========================
+// 복구키 → 새 비밀번호 설정
+// =========================
+
+async function recoverWithRecoveryKey(
+  user,
+  recoveryKeyText,
+  newPassword
+) {
+
+  try {
+
+    const profile =
+      await getCryptoProfile(
+        user.id
+      );
+
+
+    if (
+      !profile ||
+      Number(
+        profile.crypto_version
+      ) < 2 ||
+      !profile.recovery_wrapped_key
+    ) {
+
+      return false;
+
+    }
+
+
+    const recoveryKeyBytes =
+      base64UrlToBytes(
+        recoveryKeyText
+      );
+
+
+    if (
+      recoveryKeyBytes.length !==
+      32
+    ) {
+
+      return false;
+
+    }
+
+
+    const recoveryKey =
+      await importAesKey(
+        recoveryKeyBytes
+      );
+
+
+    // 복구키로 Master Key 복호화
+    const masterKeyBytes =
+      await decryptBytes(
+        profile.recovery_wrapped_key,
+        recoveryKey
+      );
+
+
+    // 새 비밀번호용 salt
+    const newSalt =
+      randomBytes(16);
+
+
+    const newPasswordKey =
+      await derivePasswordKey(
+        newPassword,
+        newSalt,
+        KDF_ITERATIONS
+      );
+
+
+    // Master Key를 새 비밀번호로 다시 잠금
+    const newPasswordWrappedKey =
+      await encryptBytes(
+        masterKeyBytes,
+        newPasswordKey
+      );
+
+
+    const newCheckPayload =
+      await encryptText(
+        V2_CHECK_TEXT,
+        newPasswordKey
+      );
+
+
+    const {
+      error
+    } =
+      await supabaseClient
+        .from(
+          "crypto_profiles"
+        )
+        .update({
+
+          salt_b64:
+            bytesToBase64(
+              newSalt
+            ),
+
+          kdf_iterations:
+            KDF_ITERATIONS,
+
+          password_wrapped_key:
+            newPasswordWrappedKey,
+
+          check_payload:
+            newCheckPayload,
+
+          updated_at:
+            new Date()
+              .toISOString()
+
+        })
+        .eq(
+          "user_id",
+          user.id
+        );
+
+
+    if (error) {
+
+      throw error;
+
+    }
+
+
+    diaryCryptoKey =
+      await importAesKey(
+        masterKeyBytes
+      );
+
+
+    return true;
+
+
+  } catch (error) {
+
+    console.error(
+      "복구 실패:",
+      error
+    );
+
+    return false;
+
+  }
+
 }
 
 
 // =========================
-// 로그아웃 시 키 제거
+// 다음 단계에서 사용할
+// 일기 데이터 암호화 함수
 // =========================
 
-function clearDiaryCryptoKey() {
+async function encryptDiaryData(
+  object
+) {
 
-  diaryCryptoKey =
-    null;
+  if (!diaryCryptoKey) {
+
+    throw new Error(
+      "일기 잠금이 해제되지 않았습니다."
+    );
+
+  }
+
+
+  return encryptText(
+    JSON.stringify(object),
+    diaryCryptoKey
+  );
 
 }
 
+
+async function decryptDiaryData(
+  payload
+) {
+
+  if (!diaryCryptoKey) {
+
+    throw new Error(
+      "일기 잠금이 해제되지 않았습니다."
+    );
+
+  }
+
+
+  const text =
+    await decryptText(
+      payload,
+      diaryCryptoKey
+    );
+
+
+  return JSON.parse(
+    text
+  );
+
+}
+
+
 // =========================
-// 암호 화면 동작
+// 복구키 화면 표시
+// =========================
+
+function showRecoveryKeyScreen(
+  recoveryKey,
+  session
+) {
+
+  const passwordPanel =
+    document.getElementById(
+      "passwordPanel"
+    );
+
+  const recoveryResetPanel =
+    document.getElementById(
+      "recoveryResetPanel"
+    );
+
+  const recoveryPanel =
+    document.getElementById(
+      "recoveryPanel"
+    );
+
+  const recoveryKeyText =
+    document.getElementById(
+      "recoveryKeyText"
+    );
+
+  const copyButton =
+    document.getElementById(
+      "copyRecoveryKeyBtn"
+    );
+
+  const savedCheck =
+    document.getElementById(
+      "recoverySavedCheck"
+    );
+
+  const continueButton =
+    document.getElementById(
+      "recoveryContinueBtn"
+    );
+
+
+  passwordPanel.style.display =
+    "none";
+
+  recoveryResetPanel.style.display =
+    "none";
+
+  recoveryPanel.style.display =
+    "block";
+
+
+  recoveryKeyText.textContent =
+    recoveryKey;
+
+
+  savedCheck.checked =
+    false;
+
+  continueButton.disabled =
+    true;
+
+
+  savedCheck.onchange =
+    () => {
+
+      continueButton.disabled =
+        !savedCheck.checked;
+
+    };
+
+
+  copyButton.onclick =
+    async () => {
+
+      try {
+
+        await navigator.clipboard
+          .writeText(
+            recoveryKey
+          );
+
+        copyButton.textContent =
+          "복사됨 ✓";
+
+      } catch {
+
+        alert(
+          "복사가 되지 않았습니다. 복구키를 직접 저장해주세요."
+        );
+
+      }
+
+    };
+
+
+  continueButton.onclick =
+    () => {
+
+      showDiary(
+        session
+      );
+
+    };
+
+}
+
+
+// =========================
+// 암호 화면 준비
 // =========================
 
 async function prepareCryptoScreen(
   session
 ) {
 
-  const cryptoTitle =
+  const title =
     document.getElementById(
       "cryptoTitle"
     );
 
-  const cryptoDescription =
+  const description =
     document.getElementById(
       "cryptoDescription"
     );
@@ -395,25 +1138,58 @@ async function prepareCryptoScreen(
       "cryptoPasswordConfirm"
     );
 
-  const cryptoButton =
+  const button =
     document.getElementById(
       "cryptoButton"
     );
 
-  const cryptoMessage =
+  const message =
     document.getElementById(
       "cryptoMessage"
     );
 
+  const passwordPanel =
+    document.getElementById(
+      "passwordPanel"
+    );
 
+  const recoveryPanel =
+    document.getElementById(
+      "recoveryPanel"
+    );
+
+  const recoveryModeBtn =
+    document.getElementById(
+      "recoveryModeBtn"
+    );
+
+  const recoveryResetPanel =
+    document.getElementById(
+      "recoveryResetPanel"
+    );
+
+
+  // 초기화
   passwordInput.value =
     "";
 
   confirmInput.value =
     "";
 
-  cryptoMessage.textContent =
+  message.textContent =
     "";
+
+  passwordPanel.style.display =
+    "block";
+
+  recoveryPanel.style.display =
+    "none";
+
+  recoveryResetPanel.style.display =
+    "none";
+
+  recoveryModeBtn.style.display =
+    "none";
 
 
   const profile =
@@ -422,74 +1198,83 @@ async function prepareCryptoScreen(
     );
 
 
-  // =====================
-  // 최초 사용자
-  // =====================
+  // =========================
+  // 완전 신규 사용자
+  // =========================
 
   if (!profile) {
 
-    cryptoTitle.textContent =
+    title.textContent =
       "일기 암호 만들기";
 
-    cryptoDescription.innerHTML =
+
+    description.innerHTML =
       `
-        이 암호로 당신의 일기와 사진을 보호합니다.<br>
-        운영자도 암호를 알 수 없습니다.
+        일기와 사진을 보호할 암호를 만들어주세요.<br>
+        암호는 서버에 저장되지 않습니다.
       `;
+
 
     confirmInput.style.display =
       "block";
 
 
-    cryptoButton.onclick =
+    button.textContent =
+      "암호 만들기";
+
+
+    button.onclick =
       async () => {
 
         const password =
           passwordInput.value;
 
-        const confirmPassword =
+        const confirm =
           confirmInput.value;
 
 
         if (
-          password.length < 8
+          password.length < 12
         ) {
 
-          cryptoMessage.textContent =
-            "암호는 최소 8자 이상으로 만들어주세요.";
+          message.textContent =
+            "암호는 최소 12자 이상으로 만들어주세요.";
 
           return;
+
         }
 
 
         if (
-          password !==
-          confirmPassword
+          password !== confirm
         ) {
 
-          cryptoMessage.textContent =
+          message.textContent =
             "두 암호가 서로 다릅니다.";
 
           return;
+
         }
 
 
-        cryptoButton.disabled =
+        button.disabled =
           true;
 
-        cryptoButton.textContent =
-          "설정 중...";
+        button.textContent =
+          "보안 설정 중...";
 
 
         try {
 
-          await createDiaryPassword(
-            session.user,
-            password
-          );
+          const recoveryKey =
+            await createV2Profile(
+              session.user,
+              password
+            );
 
 
-          showDiary(
+          showRecoveryKeyScreen(
+            recoveryKey,
             session
           );
 
@@ -498,44 +1283,59 @@ async function prepareCryptoScreen(
 
           console.error(error);
 
-          cryptoMessage.textContent =
+          message.textContent =
             "암호 설정 중 문제가 발생했습니다.";
 
         } finally {
 
-          cryptoButton.disabled =
+          button.disabled =
             false;
 
-          cryptoButton.textContent =
-            "계속";
+          button.textContent =
+            "암호 만들기";
 
         }
 
       };
 
+
+    return;
+
   }
 
 
-  // =====================
-  // 이미 암호가 있는 사용자
-  // =====================
+  // =========================
+  // 기존 V1 사용자
+  // =========================
 
-  else {
+  if (
+    Number(
+      profile.crypto_version
+    ) < 2 ||
+    !profile.password_wrapped_key ||
+    !profile.recovery_wrapped_key
+  ) {
 
-    cryptoTitle.textContent =
-      "일기 잠금 해제";
+    title.textContent =
+      "보안 업그레이드";
 
-    cryptoDescription.innerHTML =
+
+    description.innerHTML =
       `
-        일기 암호를 입력하세요.<br>
-        암호는 서버로 전송되지 않습니다.
+        기존 일기 암호를 입력해주세요.<br>
+        새로운 복구키를 발급해드립니다.
       `;
+
 
     confirmInput.style.display =
       "none";
 
 
-    cryptoButton.onclick =
+    button.textContent =
+      "보안 업그레이드";
+
+
+    button.onclick =
       async () => {
 
         const password =
@@ -544,39 +1344,43 @@ async function prepareCryptoScreen(
 
         if (!password) {
 
-          cryptoMessage.textContent =
-            "일기 암호를 입력해주세요.";
+          message.textContent =
+            "기존 일기 암호를 입력해주세요.";
 
           return;
+
         }
 
 
-        cryptoButton.disabled =
+        button.disabled =
           true;
 
-        cryptoButton.textContent =
-          "확인 중...";
+        button.textContent =
+          "업그레이드 중...";
 
 
         try {
 
-          const success =
-            await unlockDiary(
+          const result =
+            await upgradeV1ToV2(
               session.user,
+              profile,
               password
             );
 
 
-          if (!success) {
+          if (!result.success) {
 
-            cryptoMessage.textContent =
-              "암호가 올바르지 않습니다.";
+            message.textContent =
+              "일기 암호가 올바르지 않습니다.";
 
             return;
+
           }
 
 
-          showDiary(
+          showRecoveryKeyScreen(
+            result.recoveryKey,
             session
           );
 
@@ -585,21 +1389,263 @@ async function prepareCryptoScreen(
 
           console.error(error);
 
-          cryptoMessage.textContent =
-            "잠금 해제 중 문제가 발생했습니다.";
+          message.textContent =
+            "보안 업그레이드 중 문제가 발생했습니다.";
 
         } finally {
 
-          cryptoButton.disabled =
+          button.disabled =
             false;
 
-          cryptoButton.textContent =
-            "계속";
+          button.textContent =
+            "보안 업그레이드";
 
         }
 
       };
 
+
+    return;
+
   }
+
+
+  // =========================
+  // V2 사용자
+  // =========================
+
+  title.textContent =
+    "일기 잠금 해제";
+
+
+  description.innerHTML =
+    `
+      일기 암호를 입력하세요.<br>
+      암호는 서버로 전송되지 않습니다.
+    `;
+
+
+  confirmInput.style.display =
+    "none";
+
+
+  recoveryModeBtn.style.display =
+    "block";
+
+
+  button.textContent =
+    "잠금 해제";
+
+
+  button.onclick =
+    async () => {
+
+      const password =
+        passwordInput.value;
+
+
+      if (!password) {
+
+        message.textContent =
+          "일기 암호를 입력해주세요.";
+
+        return;
+
+      }
+
+
+      button.disabled =
+        true;
+
+      button.textContent =
+        "확인 중...";
+
+
+      try {
+
+        const success =
+          await unlockV2(
+            profile,
+            password
+          );
+
+
+        if (!success) {
+
+          message.textContent =
+            "암호가 올바르지 않습니다.";
+
+          return;
+
+        }
+
+
+        showDiary(
+          session
+        );
+
+
+      } finally {
+
+        button.disabled =
+          false;
+
+        button.textContent =
+          "잠금 해제";
+
+      }
+
+    };
+
+
+  // =========================
+  // 복구 모드
+  // =========================
+
+  recoveryModeBtn.onclick =
+    () => {
+
+      passwordPanel.style.display =
+        "none";
+
+      recoveryResetPanel.style.display =
+        "block";
+
+      message.textContent =
+        "";
+
+    };
+
+
+  const backButton =
+    document.getElementById(
+      "backToPasswordBtn"
+    );
+
+
+  backButton.onclick =
+    () => {
+
+      recoveryResetPanel.style.display =
+        "none";
+
+      passwordPanel.style.display =
+        "block";
+
+      message.textContent =
+        "";
+
+    };
+
+
+  const resetButton =
+    document.getElementById(
+      "recoveryResetButton"
+    );
+
+
+  resetButton.onclick =
+    async () => {
+
+      const recoveryKey =
+        document.getElementById(
+          "recoveryKeyInput"
+        ).value;
+
+
+      const newPassword =
+        document.getElementById(
+          "newDiaryPassword"
+        ).value;
+
+
+      const confirm =
+        document.getElementById(
+          "newDiaryPasswordConfirm"
+        ).value;
+
+
+      if (!recoveryKey) {
+
+        message.textContent =
+          "복구키를 입력해주세요.";
+
+        return;
+
+      }
+
+
+      if (
+        newPassword.length < 12
+      ) {
+
+        message.textContent =
+          "새 암호는 최소 12자 이상으로 만들어주세요.";
+
+        return;
+
+      }
+
+
+      if (
+        newPassword !== confirm
+      ) {
+
+        message.textContent =
+          "새 암호가 서로 다릅니다.";
+
+        return;
+
+      }
+
+
+      resetButton.disabled =
+        true;
+
+      resetButton.textContent =
+        "복구 중...";
+
+
+      try {
+
+        const success =
+          await recoverWithRecoveryKey(
+            session.user,
+            recoveryKey,
+            newPassword
+          );
+
+
+        if (!success) {
+
+          message.textContent =
+            "복구키가 올바르지 않습니다.";
+
+          return;
+
+        }
+
+
+        alert(
+          "새 일기 암호가 설정되었습니다."
+        );
+
+
+        showDiary(
+          session
+        );
+
+
+      } finally {
+
+        resetButton.disabled =
+          false;
+
+        resetButton.textContent =
+          "새 암호 설정";
+
+      }
+
+    };
 
 }

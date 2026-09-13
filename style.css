@@ -886,3 +886,70 @@ textarea {
 
   background: white;
 }
+
+/* =========================
+   복구키
+========================= */
+
+.secondary-text-button {
+  width: 100%;
+  margin-top: 15px;
+  border: 0;
+  background: transparent;
+  color: #777;
+  font-size: 12px;
+  cursor: pointer;
+}
+
+.recovery-panel {
+  margin-top: 25px;
+}
+
+.recovery-panel h2 {
+  font-size: 20px;
+  margin-bottom: 10px;
+}
+
+.recovery-panel p {
+  color: #777;
+  font-size: 13px;
+  line-height: 1.7;
+}
+
+.recovery-key {
+  margin: 20px 0 12px;
+  padding: 18px;
+  border-radius: 14px;
+  background: white;
+
+  font-family: monospace;
+  font-size: 15px;
+  line-height: 1.8;
+  word-break: break-word;
+  text-align: center;
+}
+
+.recovery-copy-button {
+  width: 100%;
+  padding: 13px;
+  border: 1px solid #ddd;
+  border-radius: 12px;
+  background: white;
+  cursor: pointer;
+}
+
+.recovery-check {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+
+  margin-top: 20px;
+
+  font-size: 12px;
+  line-height: 1.5;
+}
+
+.recovery-check input {
+  width: auto;
+  margin-top: 2px;
+}
