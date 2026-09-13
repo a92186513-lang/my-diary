@@ -1390,42 +1390,4 @@ async function refreshHome() {
 }
 
 
-// =========================
-// 로그인 완료 후에도
-// 홈 다시 불러오기
-// =========================
 
-supabaseClient.auth.onAuthStateChange(
-  (event, session) => {
-
-    if (session) {
-
-      setTimeout(
-        () => {
-
-          refreshHome();
-
-        },
-        0
-      );
-
-    }
-
-  }
-);
-
-
-// =========================
-// 앱 시작
-// =========================
-
-async function startApp() {
-
-  await refreshHome();
-
-  showHome();
-
-}
-
-
-startApp();
