@@ -861,3 +861,28 @@ textarea {
 
   font-size: 11px;
 }
+
+/* =========================
+   일기 암호
+========================= */
+
+.crypto-message {
+  min-height: 20px;
+  margin-top: 15px;
+
+  color: #c24a4a;
+
+  font-size: 12px;
+
+  line-height: 1.5;
+}
+
+
+#cryptoPassword,
+#cryptoPasswordConfirm {
+  margin-top: 20px;
+
+  padding: 16px;
+
+  background: white;
+}

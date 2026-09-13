@@ -66,6 +66,68 @@
 
   </section>
 
+  <!-- =====================
+     일기 암호 화면
+====================== -->
+
+<section
+  id="cryptoScreen"
+  class="login-screen"
+  style="display: none;"
+>
+
+  <div class="login-box">
+
+    <p class="login-small-title">
+      MY DIARY
+    </p>
+
+    <h1 id="cryptoTitle">
+      일기 잠금
+    </h1>
+
+    <p
+      id="cryptoDescription"
+      class="login-description"
+    >
+      일기를 보호할 암호를 입력하세요.
+    </p>
+
+
+    <input
+      id="cryptoPassword"
+      type="password"
+      placeholder="일기 암호"
+      autocomplete="new-password"
+    >
+
+
+    <input
+      id="cryptoPasswordConfirm"
+      type="password"
+      placeholder="일기 암호 확인"
+      autocomplete="new-password"
+      style="margin-top: 10px;"
+    >
+
+
+    <button
+      id="cryptoButton"
+      class="google-login-button"
+    >
+      계속
+    </button>
+
+
+    <p
+      id="cryptoMessage"
+      class="crypto-message"
+    ></p>
+
+  </div>
+
+</section>
+
 
   <!-- =====================
        일기 앱
@@ -377,6 +439,8 @@
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 
   <script src="auth.js"></script>
+
+  <script src="crypto.js"></script>
 
   <script src="db.js"></script>
 
