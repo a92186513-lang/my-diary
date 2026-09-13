@@ -586,9 +586,10 @@ async function openEditor(
       ) {
 
         const signedUrl =
-          await getSignedPhotoUrl(
-            photo.path
+          await getDiaryPhotoUrl(
+            photo
           );
+         
 
 
         cloudPhotos.push({
