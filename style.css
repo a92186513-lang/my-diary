@@ -953,3 +953,76 @@ textarea {
   width: auto;
   margin-top: 2px;
 }
+
+/* =========================
+   기존 기록 보안 업그레이드
+========================= */
+
+.migration-box {
+  margin: 28px 0;
+  padding: 24px;
+
+  background: #ffffff;
+
+  border-radius: 22px;
+}
+
+.migration-box h2 {
+  margin: 0 0 10px;
+
+  font-size: 18px;
+}
+
+.migration-box p {
+  margin: 0;
+
+  color: #777;
+
+  font-size: 13px;
+
+  line-height: 1.7;
+}
+
+#migrationButton {
+  width: 100%;
+
+  margin-top: 18px;
+
+  padding: 15px;
+
+  border: 0;
+
+  border-radius: 14px;
+
+  background: #222;
+
+  color: white;
+
+  font-size: 14px;
+
+  font-weight: 600;
+
+  cursor: pointer;
+}
+
+#migrationButton:disabled {
+  opacity: 0.5;
+}
+
+.migration-progress {
+  margin-top: 14px !important;
+
+  text-align: center;
+}
+
+.crypto-logout-button {
+  display: block;
+  margin-left: auto;
+  margin-bottom: 20px;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: #999;
+  font-size: 13px;
+  cursor: pointer;
+}

@@ -28,6 +28,11 @@ const supabaseClient =
 // HTML 요소
 // =========================
 
+const cryptoLogoutBtn =
+  document.getElementById(
+    "cryptoLogoutBtn"
+  );
+
 const loginScreen =
   document.getElementById("loginScreen");
 
@@ -303,6 +308,52 @@ logoutBtn.addEventListener(
 
 
     userEmail.textContent = "";
+
+    showLogin();
+
+  }
+);
+
+cryptoLogoutBtn.addEventListener(
+  "click",
+  async () => {
+
+    if (
+      typeof clearDiaryCryptoKey ===
+      "function"
+    ) {
+
+      clearDiaryCryptoKey();
+
+    }
+
+
+    const {
+      error
+    } =
+      await supabaseClient.auth
+        .signOut();
+
+
+    if (error) {
+
+      console.error(
+        "로그아웃 오류:",
+        error
+      );
+
+      alert(
+        "로그아웃 중 문제가 발생했습니다."
+      );
+
+      return;
+
+    }
+
+
+    userEmail.textContent =
+      "";
+
 
     showLogin();
 

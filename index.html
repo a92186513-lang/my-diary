@@ -81,6 +81,14 @@
       MY DIARY
     </p>
 
+    <button
+      id="cryptoLogoutBtn"
+      class="crypto-logout-button"
+      type="button"
+    >
+      로그아웃
+    </button>
+
     <h1 id="cryptoTitle">
       일기 잠금
     </h1>
@@ -346,6 +354,38 @@
         + 오늘 기록하기
       </button>
 
+<!-- =====================
+     기존 기록 암호화 안내
+====================== -->
+
+<section
+  id="migrationBox"
+  class="migration-box"
+  style="display: none;"
+>
+
+  <h2>
+    기존 기록 보안 업그레이드
+  </h2>
+
+  <p id="migrationDescription">
+    암호화되지 않은 이전 기록이 있습니다.
+    일기와 사진을 안전하게 암호화할 수 있습니다.
+  </p>
+
+  <button
+    id="migrationButton"
+    type="button"
+  >
+    보안 업그레이드 시작
+  </button>
+
+  <p
+    id="migrationProgress"
+    class="migration-progress"
+  ></p>
+
+</section>
 
       <!-- 최근 기록 -->
 
