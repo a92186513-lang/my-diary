@@ -1,4 +1,4 @@
-const CACHE_NAME = "my-diary-v12";
+const CACHE_NAME = "my-diary-v13";
 
 const FILES_TO_CACHE = [
   "./",
@@ -8,83 +8,113 @@ const FILES_TO_CACHE = [
   "./crypto.js",
   "./db.js",
   "./app.js",
-  "./manifest.json"
+  "./manifest.json",
+  "./icon-192.png",
+  "./icon-512.png"
 ];
 
 
+// =========================
 // 설치
+// =========================
+
 self.addEventListener(
   "install",
   event => {
 
     event.waitUntil(
-
       caches
         .open(CACHE_NAME)
-        .then(cache => {
-          return cache.addAll(
-            FILES_TO_CACHE
-          );
-        })
-
+        .then(cache =>
+          cache.addAll(FILES_TO_CACHE)
+        )
     );
 
+    // 새 버전 즉시 대기 해제
     self.skipWaiting();
   }
 );
 
 
+// =========================
 // 활성화
+// =========================
+
 self.addEventListener(
   "activate",
   event => {
 
     event.waitUntil(
-
       caches
         .keys()
-        .then(keys => {
+        .then(cacheNames => {
 
           return Promise.all(
+            cacheNames.map(name => {
 
-            keys
-              .filter(
-                key =>
-                  key !== CACHE_NAME
-              )
-              .map(
-                key =>
-                  caches.delete(key)
-              )
+              if (
+                name !== CACHE_NAME
+              ) {
+                return caches.delete(name);
+              }
 
+            })
           );
 
         })
-
+        .then(() =>
+          self.clients.claim()
+        )
     );
 
-    self.clients.claim();
   }
 );
 
 
-// 파일 요청
+// =========================
+// 네트워크 우선
+// =========================
+
 self.addEventListener(
   "fetch",
   event => {
 
+    const request =
+      event.request;
+
+
+    // GET 요청만 처리
     if (
-      event.request.method !== "GET"
+      request.method !== "GET"
     ) {
       return;
     }
 
+
+    const url =
+      new URL(request.url);
+
+
+    // 외부 사이트는 건드리지 않음
+    if (
+      url.origin !==
+      self.location.origin
+    ) {
+      return;
+    }
+
+
     event.respondWith(
 
-      fetch(event.request)
-
+      fetch(
+        request,
+        {
+          cache: "no-store"
+        }
+      )
         .then(response => {
 
+          // 최신 파일을 캐시에 저장
           const copy =
             response.clone();
 
@@ -92,18 +122,45 @@ self.addEventListener(
             .open(CACHE_NAME)
             .then(cache => {
               cache.put(
-                event.request,
+                request,
                 copy
               );
             });
 
+
           return response;
+
         })
+        .catch(async () => {
 
-        .catch(() => {
+          // 인터넷이 없을 때
+          // 기존 캐시 사용
+          const cached =
+            await caches.match(
+              request
+            );
 
-          return caches.match(
-            event.request
+          if (cached) {
+            return cached;
+          }
+
+
+          // 페이지 요청이면
+          // index.html을 마지막 대안으로 사용
+          if (
+            request.mode ===
+            "navigate"
+          ) {
+
+            return caches.match(
+              "./index.html"
+            );
+
+          }
+
+
+          throw new Error(
+            "Network and cache unavailable"
           );
 
         })
