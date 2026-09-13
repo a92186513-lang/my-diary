@@ -1,13 +1,13 @@
-const CACHE_NAME = "my-diary-v21";
+const CACHE_NAME = "my-diary-cache";
 
 const FILES_TO_CACHE = [
   "./",
   "./index.html",
-  "./style.css?v=21",
-  "./auth.js?v=21",
-  "./crypto.js?v=21",
-  "./db.js?v=21",
-  "./app.js?v=21",
+  "./style.css",
+  "./auth.js",
+  "./crypto.js",
+  "./db.js",
+  "./app.js",
   "./manifest.json",
   "./icon-192.png",
   "./icon-512.png"
@@ -26,12 +26,14 @@ self.addEventListener(
       caches
         .open(CACHE_NAME)
         .then(cache =>
-          cache.addAll(FILES_TO_CACHE)
+          cache.addAll(
+            FILES_TO_CACHE
+          )
         )
     );
 
-    // 새 버전 즉시 대기 해제
     self.skipWaiting();
+
   }
 );
 
@@ -45,26 +47,38 @@ self.addEventListener(
   event => {
 
     event.waitUntil(
+
       caches
         .keys()
         .then(cacheNames => {
 
           return Promise.all(
-            cacheNames.map(name => {
 
-              if (
-                name !== CACHE_NAME
-              ) {
-                return caches.delete(name);
+            cacheNames.map(
+              name => {
+
+                if (
+                  name !==
+                  CACHE_NAME
+                ) {
+
+                  return caches.delete(
+                    name
+                  );
+
+                }
+
               }
+            )
 
-            })
           );
 
         })
-        .then(() =>
-          self.clients.claim()
+        .then(
+          () =>
+            self.clients.claim()
         )
+
     );
 
   }
@@ -72,7 +86,7 @@ self.addEventListener(
 
 
 // =========================
-// 네트워크 우선
+// 최신 파일 우선
 // =========================
 
 self.addEventListener(
@@ -83,24 +97,31 @@ self.addEventListener(
       event.request;
 
 
-    // GET 요청만 처리
+    // GET만 처리
     if (
-      request.method !== "GET"
+      request.method !==
+      "GET"
     ) {
+
       return;
+
     }
 
 
     const url =
-      new URL(request.url);
+      new URL(
+        request.url
+      );
 
 
-    // 외부 사이트는 건드리지 않음
+    // 우리 사이트 파일만 처리
     if (
       url.origin !==
       self.location.origin
     ) {
+
       return;
+
     }
 
 
@@ -109,61 +130,84 @@ self.addEventListener(
       fetch(
         request,
         {
-          cache: "no-store"
+          cache:
+            "no-store"
         }
       )
+
         .then(response => {
 
-          // 최신 파일을 캐시에 저장
-          const copy =
-            response.clone();
+          // 정상 응답만 캐시에 저장
+          if (
+            response &&
+            response.ok
+          ) {
 
-          caches
-            .open(CACHE_NAME)
-            .then(cache => {
-              cache.put(
-                request,
-                copy
+            const copy =
+              response.clone();
+
+
+            caches
+              .open(
+                CACHE_NAME
+              )
+              .then(
+                cache => {
+
+                  cache.put(
+                    request,
+                    copy
+                  );
+
+                }
               );
-            });
+
+          }
 
 
           return response;
 
         })
-        .catch(async () => {
 
-          // 인터넷이 없을 때
-          // 기존 캐시 사용
-          const cached =
-            await caches.match(
-              request
+        .catch(
+          async () => {
+
+            // 인터넷이 없으면
+            // 저장된 캐시 사용
+            const cached =
+              await caches.match(
+                request
+              );
+
+
+            if (cached) {
+
+              return cached;
+
+            }
+
+
+            // 오프라인에서
+            // 페이지 요청이면
+            // index.html 표시
+            if (
+              request.mode ===
+              "navigate"
+            ) {
+
+              return caches.match(
+                "./index.html"
+              );
+
+            }
+
+
+            throw new Error(
+              "Network and cache unavailable"
             );
 
-          if (cached) {
-            return cached;
           }
-
-
-          // 페이지 요청이면
-          // index.html을 마지막 대안으로 사용
-          if (
-            request.mode ===
-            "navigate"
-          ) {
-
-            return caches.match(
-              "./index.html"
-            );
-
-          }
-
-
-          throw new Error(
-            "Network and cache unavailable"
-          );
-
-        })
+        )
 
     );
 
