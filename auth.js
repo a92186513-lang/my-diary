@@ -3,10 +3,10 @@
 // =========================
 
 const SUPABASE_URL =
-  "여기에_기존_Project_URL";
+  "https://dpupbhznbbdbobbuuopp.supabase.co";
 
 const SUPABASE_KEY =
-  "여기에_기존_Publishable_Key";
+  "PUBLISHABLE_KEY=sb_publishable_couA8z5b6tBRmrF1xoZJAA_ISxiVATJ";
 
 
 const supabaseClient =
