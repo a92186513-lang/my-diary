@@ -820,3 +820,724 @@ async function deleteDiary(
 
   return true;
 }
+
+// ========================================
+// 기존 평문 일기 → E2EE 마이그레이션
+// ========================================
+
+async function encryptLegacyPhoto(photo) {
+
+  if (!photo?.path) {
+    return null;
+  }
+
+
+  // 이미 암호화된 사진이면 그대로 사용
+  if (
+    photo.encrypted === true &&
+    photo.iv
+  ) {
+
+    return {
+      newPhoto: photo,
+      oldPath: null
+    };
+
+  }
+
+
+  const key =
+    getDiaryCryptoKey();
+
+
+  if (!key) {
+
+    throw new Error(
+      "일기 잠금이 해제되지 않았습니다."
+    );
+
+  }
+
+
+  // 기존 원본 사진 다운로드
+  const {
+    data,
+    error
+  } =
+    await supabaseClient.storage
+      .from(PHOTO_BUCKET)
+      .download(photo.path);
+
+
+  if (error) {
+    throw error;
+  }
+
+
+  const originalBuffer =
+    await data.arrayBuffer();
+
+
+  // 새로운 IV
+  const iv =
+    crypto.getRandomValues(
+      new Uint8Array(12)
+    );
+
+
+  // 기기에서 암호화
+  const encryptedBuffer =
+    await crypto.subtle.encrypt(
+      {
+        name: "AES-GCM",
+        iv: iv
+      },
+      key,
+      originalBuffer
+    );
+
+
+  const encryptedBlob =
+    new Blob(
+      [encryptedBuffer],
+      {
+        type:
+          "application/octet-stream"
+      }
+    );
+
+
+  const user =
+    await getCurrentUser();
+
+
+  // 기존 날짜/파일명 노출하지 않음
+  const newPath =
+    `${user.id}/${crypto.randomUUID()}.bin`;
+
+
+  const {
+    error: uploadError
+  } =
+    await supabaseClient.storage
+      .from(PHOTO_BUCKET)
+      .upload(
+        newPath,
+        encryptedBlob,
+        {
+          contentType:
+            "application/octet-stream",
+
+          upsert:
+            false
+        }
+      );
+
+
+  if (uploadError) {
+    throw uploadError;
+  }
+
+
+  return {
+
+    newPhoto: {
+
+      path:
+        newPath,
+
+      iv:
+        bytesToBase64(iv),
+
+      name:
+        photo.name ||
+        "photo",
+
+      type:
+        photo.type ||
+        "image/jpeg",
+
+      size:
+        photo.size ||
+        originalBuffer.byteLength,
+
+      encrypted:
+        true,
+
+      version:
+        1
+
+    },
+
+
+    // 나중에 안전하게 삭제할
+    // 기존 평문 사진 경로
+    oldPath:
+      photo.path
+
+  };
+
+}
+
+
+// ========================================
+// 기존 일기 1개 변환
+// ========================================
+
+async function migrateOneLegacyDiary(
+  row
+) {
+
+  const user =
+    await getCurrentUser();
+
+
+  const newPhotos = [];
+
+  const oldPhotoPaths = [];
+
+
+  // ------------------------
+  // 기존 사진부터
+  // 암호화된 복사본 생성
+  // ------------------------
+
+  for (
+    const photo of
+    row.photos || []
+  ) {
+
+    const result =
+      await encryptLegacyPhoto(
+        photo
+      );
+
+
+    if (!result) {
+      continue;
+    }
+
+
+    newPhotos.push(
+      result.newPhoto
+    );
+
+
+    if (result.oldPath) {
+
+      oldPhotoPaths.push(
+        result.oldPath
+      );
+
+    }
+
+  }
+
+
+  // ------------------------
+  // 기존 평문 일기 내용
+  // ------------------------
+
+  const plainData = {
+
+    mood:
+      row.mood || "",
+
+    title:
+      row.title || "",
+
+    content:
+      row.content || "",
+
+    photos:
+      newPhotos,
+
+
+    // 만약 중간에 앱이 종료돼도
+    // 다음 실행 때 원본 사진을
+    // 정리할 수 있게 암호문 안에 기록
+    migrationCleanup: {
+
+      pending:
+        oldPhotoPaths.length > 0,
+
+      oldPhotoPaths:
+        oldPhotoPaths
+
+    }
+
+  };
+
+
+  // 전체 일기 암호화
+  const encryptedPayload =
+    await encryptDiaryData(
+      plainData
+    );
+
+
+  // 실제 복호화 테스트
+  const verify =
+    await decryptDiaryData(
+      encryptedPayload
+    );
+
+
+  if (
+    verify.title !==
+      plainData.title ||
+
+    verify.content !==
+      plainData.content ||
+
+    verify.mood !==
+      plainData.mood
+  ) {
+
+    throw new Error(
+      `${row.diary_date} 암호화 검증 실패`
+    );
+
+  }
+
+
+  // ------------------------
+  // DB를 암호화 버전으로 전환
+  // ------------------------
+
+  const {
+    error
+  } =
+    await supabaseClient
+      .from("diaries")
+      .update({
+
+        mood:
+          null,
+
+        title:
+          null,
+
+        content:
+          null,
+
+        photos:
+          [],
+
+        encrypted_payload:
+          encryptedPayload,
+
+        encryption_version:
+          1,
+
+        updated_at:
+          new Date()
+            .toISOString()
+
+      })
+      .eq(
+        "user_id",
+        user.id
+      )
+      .eq(
+        "diary_date",
+        row.diary_date
+      );
+
+
+  if (error) {
+    throw error;
+  }
+
+
+  // ------------------------
+  // DB에서 다시 가져와
+  // 복호화되는지 최종 확인
+  // ------------------------
+
+  const {
+    data: savedRow,
+    error: readError
+  } =
+    await supabaseClient
+      .from("diaries")
+      .select(
+        `
+        diary_date,
+        encrypted_payload,
+        encryption_version
+        `
+      )
+      .eq(
+        "user_id",
+        user.id
+      )
+      .eq(
+        "diary_date",
+        row.diary_date
+      )
+      .single();
+
+
+  if (readError) {
+    throw readError;
+  }
+
+
+  const savedDiary =
+    await decryptDiaryData(
+      savedRow.encrypted_payload
+    );
+
+
+  if (
+    savedDiary.title !==
+      plainData.title ||
+
+    savedDiary.content !==
+      plainData.content
+  ) {
+
+    throw new Error(
+      `${row.diary_date} 저장 검증 실패`
+    );
+
+  }
+
+
+  // ------------------------
+  // 여기까지 성공했을 때만
+  // 기존 평문 사진 삭제
+  // ------------------------
+
+  if (
+    oldPhotoPaths.length > 0
+  ) {
+
+    const {
+      error: deleteError
+    } =
+      await supabaseClient.storage
+        .from(PHOTO_BUCKET)
+        .remove(
+          oldPhotoPaths
+        );
+
+
+    if (deleteError) {
+
+      console.warn(
+        "기존 사진 삭제 보류:",
+        deleteError
+      );
+
+
+      // 삭제 실패여도
+      // 암호화 데이터 자체는 안전하게 저장됨.
+      // 다음 실행에서 재시도 가능.
+
+      return {
+        migrated: true,
+        cleanupPending: true
+      };
+
+    }
+
+  }
+
+
+  // ------------------------
+  // 기존 사진 삭제 완료 후
+  // cleanup 정보도 제거
+  // ------------------------
+
+  delete plainData
+    .migrationCleanup;
+
+
+  const finalPayload =
+    await encryptDiaryData(
+      plainData
+    );
+
+
+  const {
+    error: finalError
+  } =
+    await supabaseClient
+      .from("diaries")
+      .update({
+
+        encrypted_payload:
+          finalPayload,
+
+        updated_at:
+          new Date()
+            .toISOString()
+
+      })
+      .eq(
+        "user_id",
+        user.id
+      )
+      .eq(
+        "diary_date",
+        row.diary_date
+      );
+
+
+  if (finalError) {
+    throw finalError;
+  }
+
+
+  return {
+    migrated: true,
+    cleanupPending: false
+  };
+
+}
+
+
+// ========================================
+// 중간에 남은 평문 사진 정리
+// ========================================
+
+async function cleanupMigratedDiary(
+  row
+) {
+
+  if (
+    !row.encrypted_payload
+  ) {
+    return;
+  }
+
+
+  const user =
+    await getCurrentUser();
+
+
+  const decrypted =
+    await decryptDiaryData(
+      row.encrypted_payload
+    );
+
+
+  const cleanup =
+    decrypted
+      .migrationCleanup;
+
+
+  if (
+    !cleanup?.pending ||
+    !cleanup.oldPhotoPaths?.length
+  ) {
+
+    return;
+  }
+
+
+  const {
+    error
+  } =
+    await supabaseClient.storage
+      .from(PHOTO_BUCKET)
+      .remove(
+        cleanup.oldPhotoPaths
+      );
+
+
+  if (error) {
+
+    console.warn(
+      "기존 사진 정리 재시도 실패:",
+      error
+    );
+
+    return;
+
+  }
+
+
+  delete decrypted
+    .migrationCleanup;
+
+
+  const cleanedPayload =
+    await encryptDiaryData(
+      decrypted
+    );
+
+
+  const {
+    error: updateError
+  } =
+    await supabaseClient
+      .from("diaries")
+      .update({
+
+        encrypted_payload:
+          cleanedPayload,
+
+        updated_at:
+          new Date()
+            .toISOString()
+
+      })
+      .eq(
+        "user_id",
+        user.id
+      )
+      .eq(
+        "diary_date",
+        row.diary_date
+      );
+
+
+  if (updateError) {
+    throw updateError;
+  }
+
+}
+
+
+// ========================================
+// 사용자의 전체 과거 기록 이전
+// ========================================
+
+async function migrateLegacyDiaries(
+  onProgress
+) {
+
+  const user =
+    await getCurrentUser();
+
+
+  if (!getDiaryCryptoKey()) {
+
+    throw new Error(
+      "일기 잠금이 해제되지 않았습니다."
+    );
+
+  }
+
+
+  // 원본 DB 행 그대로 가져오기
+  const {
+    data,
+    error
+  } =
+    await supabaseClient
+      .from("diaries")
+      .select(
+        `
+        diary_date,
+        mood,
+        title,
+        content,
+        photos,
+        encrypted_payload,
+        encryption_version
+        `
+      )
+      .eq(
+        "user_id",
+        user.id
+      )
+      .order(
+        "diary_date",
+        {
+          ascending: true
+        }
+      );
+
+
+  if (error) {
+    throw error;
+  }
+
+
+  const rows =
+    data || [];
+
+
+  let migratedCount = 0;
+
+
+  for (
+    let i = 0;
+    i < rows.length;
+    i++
+  ) {
+
+    const row =
+      rows[i];
+
+
+    if (
+      typeof onProgress ===
+      "function"
+    ) {
+
+      onProgress({
+        current:
+          i + 1,
+
+        total:
+          rows.length,
+
+        date:
+          row.diary_date
+      });
+
+    }
+
+
+    // ----------------------
+    // 아직 평문인 일기
+    // ----------------------
+
+    if (
+      Number(
+        row.encryption_version
+      ) === 0 ||
+      !row.encrypted_payload
+    ) {
+
+      await migrateOneLegacyDiary(
+        row
+      );
+
+
+      migratedCount++;
+
+      continue;
+
+    }
+
+
+    // ----------------------
+    // 이미 이전됐지만
+    // 예전 원본 사진 삭제가
+    // 남은 경우 정리
+    // ----------------------
+
+    await cleanupMigratedDiary(
+      row
+    );
+
+  }
+
+
+  return {
+
+    total:
+      rows.length,
+
+    migrated:
+      migratedCount
+
+  };
+
+}
